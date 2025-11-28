@@ -1,7 +1,13 @@
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
 from agent import Tool
-from models import ComponentType, UIComponent
+from models import (
+    ComponentType,
+    UIComponent,
+    LayoutType,
+    LayoutComponent,
+    AnyComponent,
+)
 from repositories import StreamlitUIRepository
 import logging
 
@@ -24,15 +30,52 @@ class UIToolService:
             logger.error(f"❌ Failed to create page: {e}", exc_info=True)
             return f"Failed to create page: {e}"
 
+    def create_layout(
+        self,
+        page_id: str,
+        layout_type: str,
+        parent_id: Optional[str] = None,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Creates a layout component (columns or container)."""
+        logger.info(
+            f"Creating layout: type={layout_type}, page_id={page_id}, parent_id={parent_id}"
+        )
+        try:
+            layout_type_enum = LayoutType(layout_type.lower())
+        except ValueError:
+            logger.error(f"Invalid layout type: {layout_type}")
+            return f"Invalid layout type: {layout_type}. Valid types are: {[t.value for t in LayoutType]}"
+
+        layout_id = str(uuid.uuid4())
+        layout = LayoutComponent(
+            id=layout_id,
+            type=layout_type_enum,
+            children=[],
+            props=props or {},
+            parent_id=parent_id,
+        )
+
+        try:
+            self.repository.add_component(page_id, layout)
+            logger.info(f"✅ Layout created successfully: {layout_id}")
+            return f"Layout created successfully. ID: {layout_id}, Type: {layout_type}"
+        except Exception as e:
+            logger.error(f"❌ Failed to create layout: {e}", exc_info=True)
+            return f"Failed to create layout: {e}"
+
     def add_component(
         self,
         page_id: str,
         type: str,
         data: Any,
+        parent_id: Optional[str] = None,
         props: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Adds a component to a specific page."""
-        logger.info(f"Adding component: type={type}, page_id={page_id}")
+        """Adds a component to a specific page or layout."""
+        logger.info(
+            f"Adding component: type={type}, page_id={page_id}, parent_id={parent_id}"
+        )
         try:
             component_type = ComponentType(type.lower())
         except ValueError:
@@ -41,7 +84,11 @@ class UIToolService:
 
         component_id = str(uuid.uuid4())
         component = UIComponent(
-            id=component_id, type=component_type, data=data, props=props or {}
+            id=component_id,
+            type=component_type,
+            data=data,
+            props=props or {},
+            parent_id=parent_id,
         )
 
         try:
@@ -77,14 +124,42 @@ class UIToolService:
                 strict=True,
             ),
             Tool(
-                name="add_component",
-                description='Add a UI component to a page. For dataframe/chart components, pass data as JSON string with format: {"columns": ["col1", "col2"], "data": [[val1, val2], [val3, val4]]}',
+                name="create_layout",
+                description="Create a layout component (columns or container) on a page. For columns, specify column widths in props as 'spec' (e.g., [1,2,1] for 3 columns). Returns layout ID for adding nested components.",
                 parameters={
                     "type": "object",
                     "properties": {
                         "page_id": {
                             "type": "string",
-                            "description": "ID of the page to add to",
+                            "description": "ID of the page",
+                        },
+                        "layout_type": {
+                            "type": "string",
+                            "description": f"Type of layout: {[t.value for t in LayoutType]}",
+                        },
+                        "parent_id": {
+                            "type": "string",
+                            "description": "Optional parent layout ID for nesting",
+                        },
+                        "props": {
+                            "type": "object",
+                            "description": "Layout properties. For columns: spec (list of widths), gap ('small'/'medium'/'large'), vertical_alignment, border. For container: border, height, width, horizontal, gap",
+                        },
+                    },
+                    "required": ["page_id", "layout_type"],
+                    "additionalProperties": False,
+                },
+                strict=True,
+            ),
+            Tool(
+                name="add_component",
+                description='Add a UI component to a page or layout. For dataframe/chart components, pass data as JSON string with format: {"columns": ["col1", "col2"], "data": [[val1, val2], [val3, val4]]}',
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "ID of the page",
                         },
                         "type": {
                             "type": "string",
@@ -93,6 +168,10 @@ class UIToolService:
                         "data": {
                             "type": "string",
                             "description": 'Content/Data for the component. For dataframe/charts, use JSON format: {"columns": [...], "data": [[...], [...]]}',
+                        },
+                        "parent_id": {
+                            "type": "string",
+                            "description": "Optional parent layout ID to add component inside a layout",
                         },
                         "props": {
                             "type": "object",

@@ -1,16 +1,20 @@
 import asyncio
 import streamlit as st
-from typing import List, Optional, Callable, Dict, Any
+from typing import List, Optional, Callable, Dict, Any, Union
 from agent import ChatAgent
 from mcp_client import MCPServerClient
 from tools import greeting, greeting_tool
 from config import MCPServerConfig
 from repositories import SessionStateUIRepository, StreamlitUIRepository
 from ui_tools import UIToolService
-from models import UIPage, ComponentType
+from models import (
+    UIPage,
+    ComponentType,
+    LayoutComponent,
+    LayoutType,
+    UIComponent,
+)
 from async_utils import GlobalLoopContext
-
-
 import logging
 
 logger = logging.getLogger("ui")
@@ -163,10 +167,64 @@ class DynamicPageRenderer:
     """Renders dynamic pages based on UIPage models."""
 
     @staticmethod
-    def render_page(page: UIPage):
-        st.title(page.title)
-        for component in page.components:
-            try:
+    def _render_component(
+        component: Union[UIComponent, LayoutComponent], depth: int = 0
+    ):
+        """Recursively render a component (content or layout)."""
+        import json
+        import pandas as pd
+
+        try:
+            if isinstance(component, LayoutComponent):
+                # Render layout component
+                if component.type == LayoutType.COLUMNS:
+                    # Get column spec from props
+                    spec = component.props.get(
+                        "spec", len(component.children) or 1
+                    )
+                    gap = component.props.get("gap", "small")
+                    vertical_alignment = component.props.get(
+                        "vertical_alignment", "top"
+                    )
+                    border = component.props.get("border", False)
+
+                    cols = st.columns(
+                        spec,
+                        gap=gap,
+                        vertical_alignment=vertical_alignment,
+                        border=border,
+                    )
+
+                    # Render children into columns
+                    for idx, child in enumerate(component.children):
+                        if idx < len(cols):
+                            with cols[idx]:
+                                DynamicPageRenderer._render_component(
+                                    child, depth + 1
+                                )
+
+                elif component.type == LayoutType.CONTAINER:
+                    # Get container props
+                    border = component.props.get("border")
+                    height = component.props.get("height", "content")
+                    width = component.props.get("width", "stretch")
+                    horizontal = component.props.get("horizontal", False)
+                    gap = component.props.get("gap", "small")
+
+                    with st.container(
+                        border=border,
+                        height=height,
+                        width=width,
+                        horizontal=horizontal,
+                        gap=gap,
+                    ):
+                        # Render children inside container
+                        for child in component.children:
+                            DynamicPageRenderer._render_component(
+                                child, depth + 1
+                            )
+            else:
+                # Render content component
                 if component.type == ComponentType.TEXT:
                     st.write(component.data)
                 elif component.type == ComponentType.MARKDOWN:
@@ -185,11 +243,7 @@ class DynamicPageRenderer:
                     data = component.data
                     if isinstance(data, str):
                         try:
-                            import json
-                            import pandas as pd
-
                             parsed = json.loads(data)
-                            # Convert to DataFrame
                             if isinstance(parsed, dict) and "data" in parsed:
                                 df = pd.DataFrame(
                                     parsed["data"],
@@ -207,13 +261,9 @@ class DynamicPageRenderer:
                     else:
                         st.dataframe(data)
                 elif component.type == ComponentType.BAR_CHART:
-                    # Parse JSON string if needed
                     data = component.data
                     if isinstance(data, str):
                         try:
-                            import json
-                            import pandas as pd
-
                             parsed = json.loads(data)
                             if isinstance(parsed, dict) and "data" in parsed:
                                 df = pd.DataFrame(
@@ -231,13 +281,9 @@ class DynamicPageRenderer:
                     else:
                         st.bar_chart(data)
                 elif component.type == ComponentType.LINE_CHART:
-                    # Parse JSON string if needed
                     data = component.data
                     if isinstance(data, str):
                         try:
-                            import json
-                            import pandas as pd
-
                             parsed = json.loads(data)
                             if isinstance(parsed, dict) and "data" in parsed:
                                 df = pd.DataFrame(
@@ -261,18 +307,38 @@ class DynamicPageRenderer:
                     )
                 else:
                     st.warning(f"Unknown component type: {component.type}")
-            except Exception as e:
-                logger.error(
-                    f"Error rendering component {component.id}: {e}",
-                    exc_info=True,
-                )
-                st.error(f"Failed to render component: {e}")
+        except Exception as e:
+            logger.error(
+                f"Error rendering component {component.id}: {e}", exc_info=True
+            )
+            st.error(f"Failed to render component: {e}")
+            if hasattr(component, "type"):
                 st.json(
                     {
-                        "type": component.type.value,
-                        "data": str(component.data)[:200],
+                        "type": (
+                            component.type.value
+                            if hasattr(component.type, "value")
+                            else str(component.type)
+                        ),
+                        "id": component.id,
                     }
                 )
+
+    @staticmethod
+    def render_page(page: UIPage):
+        """Render a complete page with all its components."""
+        st.title(page.title)
+
+        # Build a tree structure: separate top-level components from nested ones
+        top_level_components = [
+            c
+            for c in page.components
+            if not hasattr(c, "parent_id") or c.parent_id is None
+        ]
+
+        # Render top-level components
+        for component in top_level_components:
+            DynamicPageRenderer._render_component(component)
 
 
 class ChatInterface:
@@ -325,6 +391,10 @@ class ChatInterface:
                 if tool.name == "create_page":
                     self.agent.add_tool_function(
                         tool.name, ui_service.create_page
+                    )
+                elif tool.name == "create_layout":
+                    self.agent.add_tool_function(
+                        tool.name, ui_service.create_layout
                     )
                 elif tool.name == "add_component":
                     self.agent.add_tool_function(

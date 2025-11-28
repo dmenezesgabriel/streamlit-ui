@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -15,21 +15,39 @@ class ComponentType(str, Enum):
     METRIC = "metric"
 
 
+class LayoutType(str, Enum):
+    COLUMNS = "columns"
+    CONTAINER = "container"
+
+
 class UIComponent(BaseModel):
-    id: str = Field(..., description="Unique identifier for the component")
+    id: str
     type: ComponentType
-    data: Any = Field(
-        None,
-        description="Data content for the component (text, dataframe, etc.)",
+    data: Any
+    props: Dict[str, Any] = Field(default_factory=dict)
+    parent_id: Optional[str] = None  # For nesting inside layouts
+
+
+class LayoutComponent(BaseModel):
+    id: str
+    type: LayoutType
+    children: List[Union["UIComponent", "LayoutComponent"]] = Field(
+        default_factory=list
     )
-    props: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional properties (e.g., key, help, etc.)",
-    )
+    props: Dict[str, Any] = Field(default_factory=dict)
+    parent_id: Optional[str] = None  # For nesting layouts inside other layouts
+
+
+# Union type for any component (content or layout)
+AnyComponent = Union[UIComponent, LayoutComponent]
 
 
 class UIPage(BaseModel):
-    id: str = Field(..., description="Unique identifier for the page")
+    id: str
     title: str
     icon: Optional[str] = None
-    components: List[UIComponent] = Field(default_factory=list)
+    components: List[AnyComponent] = Field(default_factory=list)
+
+
+# Enable forward references for recursive types
+LayoutComponent.model_rebuild()
