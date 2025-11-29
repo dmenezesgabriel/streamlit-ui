@@ -72,6 +72,9 @@ class SidebarManager:
         async def _connect():
             results = []
             for config in self.mcp_configs:
+                if self.mcp_configs is None:
+                    continue
+
                 # Guard: Skip disabled servers
                 if not config.enabled:
                     continue
@@ -109,7 +112,10 @@ class SidebarManager:
         with st.sidebar:
             st.header("System Status")
             with st.expander("MCP Servers:"):
+                if not self.mcp_configs:
+                    return
                 for config in self.mcp_configs:
+
                     status = (
                         "Connected"
                         if config.name in self.agent.mcp_servers

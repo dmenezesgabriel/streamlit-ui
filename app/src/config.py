@@ -12,12 +12,12 @@ class MCPServerConfig:
 
 def get_default_mcp_servers() -> List[MCPServerConfig]:
     return [
-        MCPServerConfig(
-            name="playwright",
-            command="pnpx",
-            args=["@playwright/mcp@latest"],
-            enabled=True,
-        ),
+        # MCPServerConfig(
+        #     name="playwright",
+        #     command="pnpx",
+        #     args=["@playwright/mcp@latest"],
+        #     enabled=True,
+        # ),
         # Example of how to add another server
         # MCPServerConfig(
         #     name="filesystem",
