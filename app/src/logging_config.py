@@ -3,9 +3,6 @@ import logging.config
 
 
 def setup_logging(default_level=logging.INFO):
-    """
-    Setup logging configuration
-    """
     logging_config = {
         "version": 1,
         "disable_existing_loggers": False,

@@ -1,8 +1,3 @@
-"""
-Component rendering strategies using the Strategy pattern.
-Each component type has its own rendering strategy.
-"""
-
 from abc import ABC, abstractmethod
 from typing import Union
 import streamlit as st
@@ -16,11 +11,8 @@ logger = logging.getLogger("component_strategies")
 
 
 class ComponentRenderStrategy(ABC):
-    """Abstract base class for component rendering strategies."""
-
     @abstractmethod
     def render(self, component: UIComponent) -> None:
-        """Render the component using Streamlit."""
         pass
 
 
@@ -72,7 +64,6 @@ class DataFrameStrategy(ComponentRenderStrategy):
 
     @staticmethod
     def _create_dataframe(parsed: dict) -> pd.DataFrame:
-        """Create DataFrame from parsed JSON data."""
         if isinstance(parsed, dict) and "data" in parsed:
             return pd.DataFrame(
                 parsed["data"], columns=parsed.get("columns", None)
@@ -84,12 +75,10 @@ class BarChartStrategy(ComponentRenderStrategy):
     def render(self, component: UIComponent) -> None:
         data = component.data
 
-        # Guard: If data is not a string, render directly
         if not isinstance(data, str):
             st.bar_chart(data)
             return
 
-        # Try to parse JSON string
         try:
             parsed = json.loads(data)
             df = self._create_dataframe(parsed)
@@ -100,7 +89,6 @@ class BarChartStrategy(ComponentRenderStrategy):
 
     @staticmethod
     def _create_dataframe(parsed: dict) -> pd.DataFrame:
-        """Create DataFrame from parsed JSON data."""
         if isinstance(parsed, dict) and "data" in parsed:
             return pd.DataFrame(
                 parsed["data"], columns=parsed.get("columns", None)
@@ -112,12 +100,10 @@ class LineChartStrategy(ComponentRenderStrategy):
     def render(self, component: UIComponent) -> None:
         data = component.data
 
-        # Guard: If data is not a string, render directly
         if not isinstance(data, str):
             st.line_chart(data)
             return
 
-        # Try to parse JSON string
         try:
             parsed = json.loads(data)
             df = self._create_dataframe(parsed)
@@ -145,8 +131,6 @@ class MetricStrategy(ComponentRenderStrategy):
 
 
 class ComponentStrategyFactory:
-    """Factory for creating component rendering strategies."""
-
     _strategies = {
         ComponentType.TEXT: TextStrategy(),
         ComponentType.MARKDOWN: MarkdownStrategy(),
@@ -163,10 +147,9 @@ class ComponentStrategyFactory:
     def get_strategy(
         cls, component_type: ComponentType
     ) -> ComponentRenderStrategy:
-        """Get the rendering strategy for a component type."""
+
         strategy = cls._strategies.get(component_type)
 
-        # Guard: Strategy not found
         if strategy is None:
             raise ValueError(
                 f"No rendering strategy found for component type: {component_type}"
@@ -178,5 +161,4 @@ class ComponentStrategyFactory:
     def register_strategy(
         cls, component_type: ComponentType, strategy: ComponentRenderStrategy
     ) -> None:
-        """Register a new rendering strategy for a component type."""
         cls._strategies[component_type] = strategy

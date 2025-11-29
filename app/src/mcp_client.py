@@ -14,9 +14,7 @@ class MCPServerClient:
         command: Optional[str] = None,
         args: Optional[List[str]] = None,
     ):
-        # server_script_path used with default runner: `uv run <script>`
         self.server_script_path = server_script_path
-        # explicit command and args (e.g. command='npx', args=['@playwright/mcp@latest'])
         self.command = command
         self.args = args or []
         self.name = name
@@ -27,7 +25,6 @@ class MCPServerClient:
         self.tools: List[Dict[str, Any]] = []
 
     async def connect(self):
-        # Require explicit `command` + `args` to start MCP servers. No implicit `uv run` fallback.
         if not self.command:
             raise ValueError(
                 "MCPServerClient requires a 'command' to start the server. Provide command+args in the MCP config."

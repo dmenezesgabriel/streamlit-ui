@@ -62,15 +62,12 @@ class SessionStateUIRepository:
     ) -> Optional[Union[UIComponent, LayoutComponent]]:
         """Recursively find a component by ID in the component tree."""
         for comp in components:
-            # Early return: Found the component
             if comp.id == component_id:
                 return comp
 
-            # Guard: Skip if not a layout component
             if not isinstance(comp, LayoutComponent):
                 continue
 
-            # Recursively search children
             found = self._find_component_by_id(comp.children, component_id)
             if found:
                 return found
@@ -82,34 +79,26 @@ class SessionStateUIRepository:
     ) -> None:
         page = self.get_page(page_id)
 
-        # Guard: Page not found
         if not page:
             raise ValueError(f"Page with ID '{page_id}' not found.")
 
-        # Guard: No parent - add to top level
         if not hasattr(component, "parent_id") or not component.parent_id:
             page.components.append(component)
             st.session_state.ui_pages[page_id] = page
             return
 
-        # Component has a parent - find and validate it
         parent = self._find_component_by_id(
             page.components, component.parent_id
         )
-
-        # Guard: Parent not found
         if not parent:
             raise ValueError(
                 f"Parent component with ID '{component.parent_id}' not found."
             )
 
-        # Guard: Parent is not a layout component
         if not isinstance(parent, LayoutComponent):
             raise ValueError(
                 f"Parent component '{component.parent_id}' is not a layout component."
             )
-
-        # Add to parent's children
         parent.children.append(component)
         st.session_state.ui_pages[page_id] = page
 
@@ -122,11 +111,9 @@ class SessionStateUIRepository:
         """Update a page's attributes."""
         page = self.get_page(page_id)
 
-        # Guard: Page not found
         if not page:
             raise ValueError(f"Page with ID '{page_id}' not found.")
 
-        # Update attributes if provided
         if title is not None:
             page.title = title
         if icon is not None:
@@ -145,22 +132,17 @@ class SessionStateUIRepository:
         """Update a component's data or props."""
         page = self.get_page(page_id)
 
-        # Guard: Page not found
         if not page:
             raise ValueError(f"Page with ID '{page_id}' not found.")
 
-        # Find the component
         component = self._find_component_by_id(page.components, component_id)
 
-        # Guard: Component not found
         if not component:
             raise ValueError(f"Component with ID '{component_id}' not found.")
 
-        # Guard: Cannot update layout components with this method
         if isinstance(component, LayoutComponent):
             raise ValueError(f"Use update_layout to update layout components.")
 
-        # Update attributes if provided
         if data is not None:
             component.data = data
         if props is not None:
@@ -174,24 +156,19 @@ class SessionStateUIRepository:
         """Update a layout component's props."""
         page = self.get_page(page_id)
 
-        # Guard: Page not found
         if not page:
             raise ValueError(f"Page with ID '{page_id}' not found.")
 
-        # Find the layout
         layout = self._find_component_by_id(page.components, layout_id)
 
-        # Guard: Layout not found
         if not layout:
             raise ValueError(f"Layout with ID '{layout_id}' not found.")
 
-        # Guard: Must be a layout component
         if not isinstance(layout, LayoutComponent):
             raise ValueError(
                 f"Component '{layout_id}' is not a layout component."
             )
 
-        # Update props if provided
         if props is not None:
             layout.props.update(props)
 

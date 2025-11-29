@@ -18,7 +18,6 @@ class ToolManager:
             "search_tools"
         }  # Meta-tool always available
 
-        # Initialize semantic search model
         self.model = None
         self.tool_embeddings = {}
 
@@ -43,16 +42,6 @@ class ToolManager:
         category: str = "general",
         always_load: bool = False,
     ) -> None:
-        """
-        Register a tool in the registry.
-
-        Args:
-            name: Tool name
-            tool: Full tool definition
-            keywords: Search keywords for discovery
-            category: Tool category (ui_management, data_viz, etc.)
-            always_load: If True, tool is always loaded (like search_tools)
-        """
         self.registry[name] = {
             "definition": tool,
             "keywords": keywords,
@@ -64,7 +53,6 @@ class ToolManager:
             self.always_loaded.add(name)
             self.loaded_tools.add(name)
 
-        # Compute embedding if model is available
         if self.model:
             try:
                 # Combine name, description, and keywords for rich context
@@ -79,20 +67,8 @@ class ToolManager:
     def search(
         self, query: str, category: Optional[str] = None, top_k: int = 3
     ) -> str:
-        """
-        Search for tools matching the query using semantic search if available.
-
-        Args:
-            query: Search query (what the user wants to do)
-            category: Optional category filter
-            top_k: Maximum number of results to return
-
-        Returns:
-            JSON string with matching tools
-        """
         matches = []
 
-        # Use semantic search if available
         if self.model and self.tool_embeddings:
             try:
                 query_embedding = self.model.encode(query)

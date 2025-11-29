@@ -16,7 +16,6 @@ class ChatAgent:
     def __init__(
         self, max_iterations: int = 10, use_tool_manager: bool = True
     ):
-        # System message to guide the agent
         system_message = {
             "role": "system",
             "content": (
@@ -35,16 +34,12 @@ class ChatAgent:
         self.current_iteration: int = 0
         self.tool_map: Dict[str, Callable[..., str]] = {}
         self.mcp_servers: Dict[str, MCPServerClient] = {}
-        self.mcp_tools: Dict[str, List[Dict[str, Any]]] = (
-            {}
-        )  # server_name -> tools
+        self.mcp_tools: Dict[str, List[Dict[str, Any]]] = {}
 
-        # Tool Manager for lazy loading
         self.use_tool_manager = use_tool_manager
         self.tool_manager = ToolManager() if use_tool_manager else None
 
         if self.tool_manager:
-            # Register the search_tools function
             self.tool_map["search_tools"] = self.tool_manager.search
             logger.info(
                 "🔧 ToolManager enabled - tools will be loaded on-demand"
@@ -59,7 +54,6 @@ class ChatAgent:
     ) -> None:
         """Add a tool definition, optionally registering with ToolManager."""
         if self.tool_manager:
-            # Register with ToolManager for lazy loading
             keywords = keywords or [tool.name.replace("_", " ")]
             self.tool_manager.register_tool(
                 name=tool.name,
@@ -69,7 +63,6 @@ class ChatAgent:
                 always_load=always_load,
             )
         else:
-            # Legacy: add directly to tools list
             self.tools.append(tool)
 
     def add_tool_function(self, name: str, func: Callable[..., str]) -> None:
@@ -81,7 +74,6 @@ class ChatAgent:
     def aggregate_tools(self):
         """Get tools to send to LLM - uses ToolManager if enabled."""
         if self.tool_manager:
-            # Get active tools from ToolManager + search_tools
             active_tools = self.tool_manager.get_active_tools()
             search_tool = self.tool_manager.get_search_tool()
 
@@ -98,7 +90,6 @@ class ChatAgent:
                 for tool in [search_tool] + active_tools
             ]
         else:
-            # Legacy: all tools
             local_tool_schemas = [
                 {
                     "type": "function",
@@ -112,7 +103,6 @@ class ChatAgent:
                 for tool in self.tools
             ]
 
-        # MCP tools
         mcp_tool_schemas = []
         for server_name, mcp_client in self.mcp_servers.items():
             mcp_tool_schemas.extend(
@@ -146,7 +136,6 @@ class ChatAgent:
             self.current_iteration += 1
 
             try:
-                # Log the prompt being sent
                 logger.debug(f"📤 Sending prompt to LLM:")
                 logger.debug(
                     f"Messages: {json.dumps(self.messages, indent=2)}"
@@ -165,11 +154,9 @@ class ChatAgent:
                     ),
                 )
 
-                # Guard: Check for empty response
                 if not completion.choices:
                     raise Exception("Model returned an empty response.")
 
-                # Log token usage
                 usage = getattr(completion, "usage", None)
                 if usage:
                     logger.info(
@@ -182,7 +169,6 @@ class ChatAgent:
                 choice = completion.choices[0].message
                 tool_calls = getattr(choice, "tool_calls", None)
 
-                # Log the completion result
                 logger.debug(f"📥 Received completion:")
                 logger.debug(f"Content: {choice.content}")
                 if tool_calls:
@@ -190,7 +176,6 @@ class ChatAgent:
                         f"Tool calls: {[tc.function.name for tc in tool_calls]}"
                     )
 
-                # Early return: No tool calls means final response
                 if not tool_calls:
                     final_content = choice.content
                     if not final_content:
@@ -207,7 +192,6 @@ class ChatAgent:
                     )
                     return final_content
 
-                # Tool calls detected - add to message history
                 logger.info(
                     f"🔧 Tool calls detected: {len(tool_calls)} tool(s)"
                 )
@@ -233,7 +217,6 @@ class ChatAgent:
                     }
                 )
 
-                # Process each tool call
                 for tool_call in tool_calls:
                     if on_tool_call:
                         on_tool_call(tool_call)
@@ -241,14 +224,12 @@ class ChatAgent:
                     name = tool_call.function.name
                     kwargs = json.loads(tool_call.function.arguments)
 
-                    # Find tool origin
                     origins = [
                         tool["origin"]
                         for tool in tool_schemas
                         if tool["function"]["name"] == name
                     ]
 
-                    # Guard: No origins found
                     if not origins:
                         result_str = f"Error: Tool '{name}' not found in available tools."
                         self._append_tool_result(tool_call.id, result_str)
@@ -256,12 +237,10 @@ class ChatAgent:
                             on_tool_result(tool_call, result_str)
                         continue
 
-                    # Resolve origin if ambiguous
                     chosen_origin = origins[0]
                     if len(origins) > 1 and user_choice_callback:
                         chosen_origin = user_choice_callback(name, origins)
 
-                    # Execute tool based on origin
                     result_str = self._execute_tool(
                         name, kwargs, chosen_origin, tool_executor
                     )
@@ -284,23 +263,18 @@ class ChatAgent:
         origin: str,
         tool_executor: Optional[Callable[[Any], Any]],
     ) -> str:
-        """Execute a tool and return the result as a string."""
-        # Local tool execution
         if origin == "local":
             result = self.tool_map[name](**kwargs)
             return result if isinstance(result, str) else str(result)
 
-        # MCP tool execution
         mcp_client = self.mcp_servers[origin]
 
-        # Guard: Require executor for MCP tools
         if not tool_executor:
             raise ValueError("tool_executor is required for MCP tool calls")
 
         return tool_executor(mcp_client.call_tool(name, kwargs))
 
     def _append_tool_result(self, tool_call_id: str, result: str) -> None:
-        """Append a tool result to the message history."""
         self.messages.append(
             {
                 "role": "tool",
