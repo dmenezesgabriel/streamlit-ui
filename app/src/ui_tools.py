@@ -1,14 +1,14 @@
 import uuid
 from typing import Any, Dict, Optional, List, Union
-from agent import Tool
-from models import (
+from src.agent import Tool
+from src.models import (
     ComponentType,
     UIComponent,
     LayoutType,
     LayoutComponent,
     AnyComponent,
 )
-from repositories import StreamlitUIRepository
+from src.repositories import StreamlitUIRepository
 import logging
 
 logger = logging.getLogger("ui_tools")

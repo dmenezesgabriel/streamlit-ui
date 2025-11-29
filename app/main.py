@@ -1,8 +1,8 @@
 import streamlit as st
-from ui import ChatInterface, DynamicPageRenderer
-from config import get_default_mcp_servers
-from repositories import SessionStateUIRepository
-from logging_config import setup_logging
+from src.ui import ChatInterface, DynamicPageRenderer
+from src.config import get_default_mcp_servers
+from src.repositories import SessionStateUIRepository
+from src.logging_config import setup_logging
 import logging
 
 # Setup logging

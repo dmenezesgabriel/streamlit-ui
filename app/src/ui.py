@@ -1,21 +1,22 @@
 import asyncio
 import streamlit as st
 from typing import List, Optional, Callable, Dict, Any, Union
-from agent import ChatAgent
-from mcp_client import MCPServerClient
-from tools import greeting, greeting_tool
-from config import MCPServerConfig
-from repositories import SessionStateUIRepository, StreamlitUIRepository
-from ui_tools import UIToolService
-from models import (
+from src.agent import ChatAgent
+from src.mcp_client import MCPServerClient
+from src.tools import greeting, greeting_tool
+from src.config import MCPServerConfig
+from src.repositories import SessionStateUIRepository, StreamlitUIRepository
+from src.ui_tools import UIToolService
+from src.models import (
     UIPage,
     ComponentType,
     LayoutComponent,
     LayoutType,
     UIComponent,
 )
-from async_utils import GlobalLoopContext
+from src.async_utils import GlobalLoopContext
 import logging
+from src.component_strategies import ComponentStrategyFactory
 
 logger = logging.getLogger("ui")
 
@@ -139,7 +140,8 @@ class MessageRenderer:
                             f"Called tool: {tool_meta['name']}",
                             state="complete",
                         ):
-                            st.write(f"Arguments: {tool_meta['arguments']}")
+                            st.write(f"Arguments: ")
+                            st.json(tool_meta["arguments"])
 
                         if "result" in tool_meta:
                             with st.expander(
@@ -161,7 +163,8 @@ class MessageRenderer:
         with st.status(
             f"Calling tool: {tool_call.function.name}...", expanded=False
         ) as status:
-            st.write(f"Arguments: {tool_call.function.arguments}")
+            st.write(f"Arguments:   ")
+            st.json(tool_call.function.arguments)
             status.update(
                 label=f"Called tool: {tool_call.function.name}",
                 state="complete",
@@ -205,7 +208,6 @@ class DynamicPageRenderer:
         component: Union[UIComponent, LayoutComponent], depth: int = 0
     ):
         """Recursively render a component (content or layout)."""
-        from component_strategies import ComponentStrategyFactory
 
         try:
             # Handle layout components

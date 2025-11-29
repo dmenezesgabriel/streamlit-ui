@@ -1,6 +1,6 @@
 from typing import List, Optional, Protocol, Union
 import streamlit as st
-from models import UIPage, UIComponent, LayoutComponent, AnyComponent
+from src.models import UIPage, UIComponent, LayoutComponent, AnyComponent
 
 
 class StreamlitUIRepository(Protocol):

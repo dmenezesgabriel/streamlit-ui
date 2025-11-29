@@ -1,4 +1,4 @@
-from agent import Tool
+from src.agent import Tool
 
 greeting_tool = Tool(
     name="greeting",

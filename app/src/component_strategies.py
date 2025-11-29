@@ -10,7 +10,7 @@ import json
 import pandas as pd
 import logging
 
-from models import UIComponent, LayoutComponent, ComponentType, LayoutType
+from src.models import UIComponent, LayoutComponent, ComponentType, LayoutType
 
 logger = logging.getLogger("component_strategies")
 

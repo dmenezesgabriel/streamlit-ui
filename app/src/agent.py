@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional
 import litellm  # type: ignore
 from pydantic import BaseModel  # type: ignore
 
-from mcp_client import MCPServerClient
+from src.mcp_client import MCPServerClient
 
 
 class Tool(BaseModel):
