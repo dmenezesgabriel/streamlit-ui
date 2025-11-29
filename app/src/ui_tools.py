@@ -1,6 +1,6 @@
 import uuid
 from typing import Any, Dict, Optional, List, Union
-from src.agent import Tool
+from src.tool_models import Tool
 from src.models import (
     ComponentType,
     UIComponent,

@@ -12,6 +12,8 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "rich>=14.2.0",
     "streamlit>=1.51.0",
+    "sentence-transformers>=3.0.0",
+    "numpy>=1.26.0",
 ]
 
 [dependency-groups]

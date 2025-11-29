@@ -6,20 +6,30 @@ import litellm  # type: ignore
 from pydantic import BaseModel  # type: ignore
 
 from src.mcp_client import MCPServerClient
+from src.tool_models import Tool
+from src.tool_manager import ToolManager
 
 logger = logging.getLogger("agent")
 
 
-class Tool(BaseModel):
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-    strict: bool
-
-
 class ChatAgent:
-    def __init__(self, max_iterations: int = 10):
-        self.messages: List[Dict[str, Any]] = []
+    def __init__(
+        self, max_iterations: int = 10, use_tool_manager: bool = True
+    ):
+        # System message to guide the agent
+        system_message = {
+            "role": "system",
+            "content": (
+                "You are an autonomous AI assistant with access to tools. "
+                "Your primary goal is to EXECUTE the user's request using available tools. "
+                "CRITICAL INSTRUCTION: When you use search_tools and it returns relevant tools, you MUST use them IMMEDIATELY in the next turn. "
+                "DO NOT ask for permission. DO NOT say 'I found a tool, should I use it?'. Just USE the tool. "
+                "If the user says 'create a page' and you find 'create_page', call create_page(title=...) immediately. "
+                "Assume the user wants you to take action, not just chat about it."
+            ),
+        }
+
+        self.messages: List[Dict[str, Any]] = [system_message]
         self.tools: List[Tool] = []
         self.max_iterations: int = max_iterations
         self.current_iteration: int = 0
@@ -29,8 +39,38 @@ class ChatAgent:
             {}
         )  # server_name -> tools
 
-    def add_tool_definition(self, tool: Tool) -> None:
-        self.tools.append(tool)
+        # Tool Manager for lazy loading
+        self.use_tool_manager = use_tool_manager
+        self.tool_manager = ToolManager() if use_tool_manager else None
+
+        if self.tool_manager:
+            # Register the search_tools function
+            self.tool_map["search_tools"] = self.tool_manager.search
+            logger.info(
+                "🔧 ToolManager enabled - tools will be loaded on-demand"
+            )
+
+    def add_tool_definition(
+        self,
+        tool: Tool,
+        keywords: Optional[List[str]] = None,
+        category: str = "general",
+        always_load: bool = False,
+    ) -> None:
+        """Add a tool definition, optionally registering with ToolManager."""
+        if self.tool_manager:
+            # Register with ToolManager for lazy loading
+            keywords = keywords or [tool.name.replace("_", " ")]
+            self.tool_manager.register_tool(
+                name=tool.name,
+                tool=tool,
+                keywords=keywords,
+                category=category,
+                always_load=always_load,
+            )
+        else:
+            # Legacy: add directly to tools list
+            self.tools.append(tool)
 
     def add_tool_function(self, name: str, func: Callable[..., str]) -> None:
         self.tool_map[name] = func
@@ -39,19 +79,39 @@ class ChatAgent:
         self.mcp_servers[server_name] = mcp_client
 
     def aggregate_tools(self):
-        # Local tools
-        local_tool_schemas = [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                },
-                "origin": "local",
-            }
-            for tool in self.tools
-        ]
+        """Get tools to send to LLM - uses ToolManager if enabled."""
+        if self.tool_manager:
+            # Get active tools from ToolManager + search_tools
+            active_tools = self.tool_manager.get_active_tools()
+            search_tool = self.tool_manager.get_search_tool()
+
+            local_tool_schemas = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.parameters,
+                    },
+                    "origin": "local",
+                }
+                for tool in [search_tool] + active_tools
+            ]
+        else:
+            # Legacy: all tools
+            local_tool_schemas = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.parameters,
+                    },
+                    "origin": "local",
+                }
+                for tool in self.tools
+            ]
+
         # MCP tools
         mcp_tool_schemas = []
         for server_name, mcp_client in self.mcp_servers.items():

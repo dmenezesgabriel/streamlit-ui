@@ -332,15 +332,13 @@ class ChatInterface:
 
     def _create_agent(self) -> ChatAgent:
         agent = ChatAgent()
-        agent.add_tool_definition(greeting_tool)
+        agent.add_tool_definition(
+            greeting_tool,
+            keywords=["hello", "hi", "greet", "greeting"],
+            category="general",
+            always_load=True,  # Always available for simple interactions
+        )
         agent.add_tool_function("greeting", greeting)
-
-        # Add UI tools
-        # Note: We need to access the repository, but it might not be initialized yet when this runs inside initialize_state.
-        # However, initialize_state initializes ui_repository immediately after agent if not present.
-        # But here we are passing a factory.
-        # A better approach is to add tools AFTER agent creation in __init__ if possible, or lazy load.
-        # For now, we will add them in __init__ of ChatInterface to ensure repository exists.
         return agent
 
     def initialize(self):
@@ -348,12 +346,77 @@ class ChatInterface:
         self.sidebar.connect_servers()
 
         # Guard: Tools already registered
-        tool_names = [t.name for t in self.agent.tools]
-        if "create_page" in tool_names:
-            return
+        if self.agent.tool_manager:
+            stats = self.agent.tool_manager.get_stats()
+            if stats["total_registered"] > 1:  # More than just search_tools
+                return
+        else:
+            tool_names = [t.name for t in self.agent.tools]
+            if "create_page" in tool_names:
+                return
 
-        # Register UI tools
+        # Register UI tools with keywords for discovery
         ui_service = UIToolService(self.ui_repository)
+
+        # Define tool metadata for lazy loading
+        tool_metadata = {
+            "create_page": {
+                "keywords": ["create", "new", "page", "dashboard", "add page"],
+                "category": "ui_management",
+            },
+            "create_layout": {
+                "keywords": [
+                    "create",
+                    "layout",
+                    "columns",
+                    "container",
+                    "grid",
+                ],
+                "category": "ui_management",
+            },
+            "add_component": {
+                "keywords": [
+                    "add",
+                    "component",
+                    "text",
+                    "chart",
+                    "metric",
+                    "widget",
+                ],
+                "category": "ui_management",
+            },
+            "update_page": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "page",
+                    "title",
+                    "icon",
+                ],
+                "category": "ui_management",
+            },
+            "update_component": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "component",
+                    "data",
+                ],
+                "category": "ui_management",
+            },
+            "update_layout": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "layout",
+                    "columns",
+                ],
+                "category": "ui_management",
+            },
+        }
 
         # Map tool names to their implementation methods
         tool_function_map = {
@@ -366,13 +429,23 @@ class ChatInterface:
         }
 
         for tool in ui_service.get_tools():
-            self.agent.add_tool_definition(tool)
+            metadata = tool_metadata.get(tool.name, {})
+            self.agent.add_tool_definition(
+                tool,
+                keywords=metadata.get("keywords", [tool.name]),
+                category=metadata.get("category", "general"),
+                always_load=False,  # Don't load UI tools by default
+            )
 
             # Register tool function using mapping
             if tool.name in tool_function_map:
                 self.agent.add_tool_function(
                     tool.name, tool_function_map[tool.name]
                 )
+
+        logger.info(
+            f"✅ Registered {len(tool_function_map)} UI tools for lazy loading"
+        )
 
     def _process_user_message(self, prompt: str) -> None:
         """Process a user message and handle the agent response."""

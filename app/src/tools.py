@@ -1,4 +1,4 @@
-from src.agent import Tool
+from src.tool_models import Tool
 
 greeting_tool = Tool(
     name="greeting",
