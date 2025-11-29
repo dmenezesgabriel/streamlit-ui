@@ -18,8 +18,15 @@ class UIToolService:
     def __init__(self, repository: StreamlitUIRepository):
         self.repository = repository
 
-    def create_page(self, title: str, icon: Optional[str] = None) -> str:
+    def create_page(
+        self, title: str, icon: Optional[str] = None, **kwargs
+    ) -> str:
         """Creates a new page in the UI."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in create_page: {kwargs}"
+            )
+
         page_id = str(uuid.uuid4())
         logger.info(f"Creating page: title='{title}', id={page_id}")
         try:
@@ -36,8 +43,13 @@ class UIToolService:
         layout_type: str,
         parent_id: Optional[str] = None,
         props: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> str:
         """Creates a layout component (columns or container)."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in create_layout: {kwargs}"
+            )
         logger.info(
             f"Creating layout: type={layout_type}, page_id={page_id}, parent_id={parent_id}"
         )
@@ -71,8 +83,13 @@ class UIToolService:
         data: Any,
         parent_id: Optional[str] = None,
         props: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> str:
         """Adds a component to a specific page or layout."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in add_component: {kwargs}"
+            )
         logger.info(
             f"Adding component: type={type}, page_id={page_id}, parent_id={parent_id}"
         )
@@ -106,8 +123,13 @@ class UIToolService:
         page_id: str,
         title: Optional[str] = None,
         icon: Optional[str] = None,
+        **kwargs,
     ) -> str:
         """Update a page's title or icon."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in update_page: {kwargs}"
+            )
         logger.info(
             f"Updating page: page_id={page_id}, title={title}, icon={icon}"
         )
@@ -125,8 +147,13 @@ class UIToolService:
         component_id: str,
         data: Optional[str] = None,
         props: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> str:
         """Update a component's data or props."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in update_component: {kwargs}"
+            )
         logger.info(
             f"Updating component: component_id={component_id}, page_id={page_id}"
         )
@@ -145,8 +172,13 @@ class UIToolService:
         page_id: str,
         layout_id: str,
         props: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> str:
         """Update a layout's props."""
+        if kwargs:
+            logger.warning(
+                f"Ignored unexpected arguments in update_layout: {kwargs}"
+            )
         logger.info(
             f"Updating layout: layout_id={layout_id}, page_id={page_id}"
         )

@@ -127,12 +127,12 @@ class ChatAgent:
 
             try:
                 logger.debug(f"📤 Sending prompt to LLM:")
-                logger.debug(
-                    f"Messages: {json.dumps(self.messages, indent=2)}"
-                )
+                # Log tools being sent
+                tool_names = [t["function"]["name"] for t in tool_schemas]
+                logger.debug(f"🛠️ Sending tools to LLM: {tool_names}")
 
                 completion = litellm.completion(
-                    model="gemini/gemini-2.0-flash",
+                    model="groq/llama-3.3-70b-versatile",
                     messages=self.messages,
                     tools=(
                         [

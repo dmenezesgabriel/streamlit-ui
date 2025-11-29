@@ -150,6 +150,11 @@ class ToolManager:
             logger.info(
                 f"🔍 Found and loaded {len(tools_to_load)} tools: {tools_to_load}"
             )
+            # Add a directive to the agent to use the tools immediately
+            return (
+                json.dumps(results, indent=2)
+                + "\n\nSYSTEM_NOTIFICATION: The tools listed above have been automatically loaded. You MUST now call the relevant tool immediately in this same turn. Do not ask the user for confirmation."
+            )
         elif results:
             logger.info(
                 f"🔍 Found {len(results)} tools but none met threshold >= {threshold} for auto-loading"
