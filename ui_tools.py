@@ -101,6 +101,63 @@ class UIToolService:
             logger.error(f"❌ Failed to add component: {e}", exc_info=True)
             return f"Failed to add component: {e}"
 
+    def update_page(
+        self,
+        page_id: str,
+        title: Optional[str] = None,
+        icon: Optional[str] = None,
+    ) -> str:
+        """Update a page's title or icon."""
+        logger.info(
+            f"Updating page: page_id={page_id}, title={title}, icon={icon}"
+        )
+        try:
+            self.repository.update_page(page_id, title, icon)
+            logger.info(f"✅ Page updated successfully: {page_id}")
+            return f"Page {page_id} updated successfully."
+        except Exception as e:
+            logger.error(f"❌ Failed to update page: {e}", exc_info=True)
+            return f"Failed to update page: {e}"
+
+    def update_component(
+        self,
+        page_id: str,
+        component_id: str,
+        data: Optional[str] = None,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Update a component's data or props."""
+        logger.info(
+            f"Updating component: component_id={component_id}, page_id={page_id}"
+        )
+        try:
+            self.repository.update_component(
+                page_id, component_id, data, props
+            )
+            logger.info(f"✅ Component updated successfully: {component_id}")
+            return f"Component {component_id} updated successfully."
+        except Exception as e:
+            logger.error(f"❌ Failed to update component: {e}", exc_info=True)
+            return f"Failed to update component: {e}"
+
+    def update_layout(
+        self,
+        page_id: str,
+        layout_id: str,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Update a layout's props."""
+        logger.info(
+            f"Updating layout: layout_id={layout_id}, page_id={page_id}"
+        )
+        try:
+            self.repository.update_layout(page_id, layout_id, props)
+            logger.info(f"✅ Layout updated successfully: {layout_id}")
+            return f"Layout {layout_id} updated successfully."
+        except Exception as e:
+            logger.error(f"❌ Failed to update layout: {e}", exc_info=True)
+            return f"Failed to update layout: {e}"
+
     def get_tools(self) -> list[Tool]:
         return [
             Tool(
@@ -179,6 +236,82 @@ class UIToolService:
                         },
                     },
                     "required": ["page_id", "type", "data"],
+                    "additionalProperties": False,
+                },
+                strict=True,
+            ),
+            Tool(
+                name="update_page",
+                description="Update a page's title or icon.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "ID of the page to update",
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "New title for the page (optional)",
+                        },
+                        "icon": {
+                            "type": "string",
+                            "description": "New icon for the page (optional)",
+                        },
+                    },
+                    "required": ["page_id"],
+                    "additionalProperties": False,
+                },
+                strict=True,
+            ),
+            Tool(
+                name="update_component",
+                description="Update a component's data or props.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "ID of the page containing the component",
+                        },
+                        "component_id": {
+                            "type": "string",
+                            "description": "ID of the component to update",
+                        },
+                        "data": {
+                            "type": "string",
+                            "description": "New data for the component (optional)",
+                        },
+                        "props": {
+                            "type": "object",
+                            "description": "Properties to update (optional, will be merged with existing props)",
+                        },
+                    },
+                    "required": ["page_id", "component_id"],
+                    "additionalProperties": False,
+                },
+                strict=True,
+            ),
+            Tool(
+                name="update_layout",
+                description="Update a layout component's props (e.g., change column widths, gap, border).",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "ID of the page containing the layout",
+                        },
+                        "layout_id": {
+                            "type": "string",
+                            "description": "ID of the layout to update",
+                        },
+                        "props": {
+                            "type": "object",
+                            "description": "Properties to update (will be merged with existing props)",
+                        },
+                    },
+                    "required": ["page_id", "layout_id", "props"],
                     "additionalProperties": False,
                 },
                 strict=True,

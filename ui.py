@@ -59,6 +59,7 @@ class SidebarManager:
         self.loop_context = loop_context
 
     def connect_servers(self):
+        # Guard: Already connected
         if st.session_state.mcp_connected:
             return
 
@@ -68,16 +69,17 @@ class SidebarManager:
         # However, run_coroutine blocks until done, so we are back in main thread after it returns.
 
         async def _connect():
-            connected_count = 0
             results = []
             for config in self.mcp_configs:
+                # Guard: Skip disabled servers
                 if not config.enabled:
                     continue
 
-                try:
-                    if config.name in self.agent.mcp_servers:
-                        continue
+                # Guard: Skip already connected servers
+                if config.name in self.agent.mcp_servers:
+                    continue
 
+                try:
                     logger.debug(f"Connecting to {config.name}...")
                     client = MCPServerClient(
                         name=config.name,
@@ -123,8 +125,9 @@ class MessageRenderer:
 
     def render_history(self, messages: List[Dict[str, Any]]):
         for message in messages:
+            # Guard: Skip tool messages
             if message["role"] == "tool":
-                continue  # Tool results are shown with assistant messages
+                continue
 
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -336,89 +339,89 @@ class ChatInterface:
         # Synchronous wrapper that calls async logic on background loop
         self.sidebar.connect_servers()
 
-        # Register UI tools if not already registered
-        # We check if the tool is already in the agent to avoid duplicates on re-runs if agent persists
-        # But agent is in session state, so it persists.
-        # We should only add them once.
-
-        # Simple check: look for tool name
+        # Guard: Tools already registered
         tool_names = [t.name for t in self.agent.tools]
-        if "create_page" not in tool_names:
-            ui_service = UIToolService(self.ui_repository)
-            for tool in ui_service.get_tools():
-                self.agent.add_tool_definition(tool)
-                # We need to bind the methods to the service instance
-                if tool.name == "create_page":
-                    self.agent.add_tool_function(
-                        tool.name, ui_service.create_page
-                    )
-                elif tool.name == "create_layout":
-                    self.agent.add_tool_function(
-                        tool.name, ui_service.create_layout
-                    )
-                elif tool.name == "add_component":
-                    self.agent.add_tool_function(
-                        tool.name, ui_service.add_component
-                    )
+        if "create_page" in tool_names:
+            return
+
+        # Register UI tools
+        ui_service = UIToolService(self.ui_repository)
+
+        # Map tool names to their implementation methods
+        tool_function_map = {
+            "create_page": ui_service.create_page,
+            "create_layout": ui_service.create_layout,
+            "add_component": ui_service.add_component,
+            "update_page": ui_service.update_page,
+            "update_component": ui_service.update_component,
+            "update_layout": ui_service.update_layout,
+        }
+
+        for tool in ui_service.get_tools():
+            self.agent.add_tool_definition(tool)
+
+            # Register tool function using mapping
+            if tool.name in tool_function_map:
+                self.agent.add_tool_function(
+                    tool.name, tool_function_map[tool.name]
+                )
+
+    def _process_user_message(self, prompt: str) -> None:
+        """Process a user message and handle the agent response."""
+        message_placeholder = st.empty()
+
+        # Capture initial page count to detect changes
+        initial_page_count = len(self.ui_repository.get_all_pages())
+
+        try:
+            # Run the agent logic synchronously (callbacks in main thread)
+            response = self.agent.process_message(
+                prompt,
+                user_choice_callback=self.renderer.user_choice_callback,
+                on_tool_call=self.renderer.on_tool_call,
+                on_tool_result=self.renderer.on_tool_result,
+                tool_executor=self.loop_context.run_coroutine,
+            )
+            message_placeholder.markdown(response)
+
+            # Get tool calls metadata and save with message
+            tool_calls_metadata = self.renderer.get_and_clear_tool_calls()
+            assistant_message = {"role": "assistant", "content": response}
+            if tool_calls_metadata:
+                assistant_message["tool_calls_metadata"] = tool_calls_metadata
+
+            st.session_state.messages.append(assistant_message)
+
+            # Check if pages changed and rerun if necessary
+            final_page_count = len(self.ui_repository.get_all_pages())
+            if final_page_count != initial_page_count:
+                logger.info(
+                    "Page count changed, rerunning to update navigation."
+                )
+                st.rerun()
+
+        except Exception as e:
+            logger.error(f"Error processing message: {e}", exc_info=True)
+            st.error(f"An error occurred: {e}")
 
     def run(self):
-        # Initialization (sync check, async execution inside)
+        # Guard: Initialize if not connected
         if not st.session_state.mcp_connected:
             self.initialize()
 
         self.sidebar.render()
         self.renderer.render_history(st.session_state.messages)
 
-        if prompt := st.chat_input("What is up?"):
-            st.session_state.messages.append(
-                {"role": "user", "content": prompt}
-            )
-            with st.chat_message("user"):
-                st.markdown(prompt)
+        # Guard: No input, nothing to do
+        prompt = st.chat_input("What is up?")
+        if not prompt:
+            return
 
-            with st.chat_message("assistant"):
-                message_placeholder = st.empty()
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-                # Capture initial page count to detect changes
-                initial_page_count = len(self.ui_repository.get_all_pages())
-
-                try:
-                    # Run the agent logic synchronously (callbacks in main thread)
-                    # Pass the loop_context.run_coroutine as the executor for async MCP calls
-                    response = self.agent.process_message(
-                        prompt,
-                        user_choice_callback=self.renderer.user_choice_callback,
-                        on_tool_call=self.renderer.on_tool_call,
-                        on_tool_result=self.renderer.on_tool_result,
-                        tool_executor=self.loop_context.run_coroutine,
-                    )
-                    message_placeholder.markdown(response)
-
-                    # Get tool calls metadata and save with message
-                    tool_calls_metadata = (
-                        self.renderer.get_and_clear_tool_calls()
-                    )
-                    assistant_message = {
-                        "role": "assistant",
-                        "content": response,
-                    }
-                    if tool_calls_metadata:
-                        assistant_message["tool_calls_metadata"] = (
-                            tool_calls_metadata
-                        )
-
-                    st.session_state.messages.append(assistant_message)
-
-                    # Check if pages changed and rerun if necessary
-                    final_page_count = len(self.ui_repository.get_all_pages())
-                    if final_page_count != initial_page_count:
-                        logger.info(
-                            "Page count changed, rerunning to update navigation."
-                        )
-                        st.rerun()
-
-                except Exception as e:
-                    logger.error(
-                        f"Error processing message: {e}", exc_info=True
-                    )
-                    st.error(f"An error occurred: {e}")
+        # Process with assistant
+        with st.chat_message("assistant"):
+            self._process_user_message(prompt)
