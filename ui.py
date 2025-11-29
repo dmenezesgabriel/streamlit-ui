@@ -107,13 +107,13 @@ class SidebarManager:
     def render(self):
         with st.sidebar:
             st.header("System Status")
-            st.write("MCP Servers:")
-            for config in self.mcp_configs:
-                status = (
-                    "🟢 Connected"
-                    if config.name in self.agent.mcp_servers
-                    else "⚪ Disabled/Disconnected"
-                )
+            with st.expander("MCP Servers:"):
+                for config in self.mcp_configs:
+                    status = (
+                        "Connected"
+                        if config.name in self.agent.mcp_servers
+                        else "Disabled/Disconnected"
+                    )
                 st.write(f"- **{config.name}**: {status}")
 
 
