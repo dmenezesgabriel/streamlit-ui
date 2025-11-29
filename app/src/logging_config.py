@@ -1,6 +1,5 @@
 import logging
 import logging.config
-import os
 
 
 def setup_logging(default_level=logging.INFO):
@@ -35,6 +34,34 @@ def setup_logging(default_level=logging.INFO):
                 "level": default_level,
                 "propagate": True,
             },
+            # Suppress LiteLLM logs
+            "LiteLLM": {
+                "handlers": ["file"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "LiteLLM.Router": {
+                "handlers": [],
+                "level": "ERROR",
+                "propagate": False,
+            },
+            "LiteLLM.Proxy": {
+                "handlers": [],
+                "level": "ERROR",
+                "propagate": False,
+            },
+            # Suppress other noisy loggers
+            "httpx": {
+                "handlers": [],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "httpcore": {
+                "handlers": [],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            # Application loggers
             "streamlit": {
                 "handlers": ["console", "file"],
                 "level": "INFO",

@@ -1,10 +1,13 @@
 import json
 from typing import Any, Callable, Dict, List, Optional
+import logging
 
 import litellm  # type: ignore
 from pydantic import BaseModel  # type: ignore
 
 from src.mcp_client import MCPServerClient
+
+logger = logging.getLogger("agent")
 
 
 class Tool(BaseModel):
@@ -83,6 +86,12 @@ class ChatAgent:
             self.current_iteration += 1
 
             try:
+                # Log the prompt being sent
+                logger.debug(f"📤 Sending prompt to LLM:")
+                logger.debug(
+                    f"Messages: {json.dumps(self.messages, indent=2)}"
+                )
+
                 completion = litellm.completion(
                     model="gemini/gemini-2.0-flash",
                     messages=self.messages,
@@ -100,8 +109,26 @@ class ChatAgent:
                 if not completion.choices:
                     raise Exception("Model returned an empty response.")
 
+                # Log token usage
+                usage = getattr(completion, "usage", None)
+                if usage:
+                    logger.info(
+                        f"📊 Token Usage - "
+                        f"Prompt: {usage.prompt_tokens}, "
+                        f"Completion: {usage.completion_tokens}, "
+                        f"Total: {usage.total_tokens}"
+                    )
+
                 choice = completion.choices[0].message
                 tool_calls = getattr(choice, "tool_calls", None)
+
+                # Log the completion result
+                logger.debug(f"📥 Received completion:")
+                logger.debug(f"Content: {choice.content}")
+                if tool_calls:
+                    logger.debug(
+                        f"Tool calls: {[tc.function.name for tc in tool_calls]}"
+                    )
 
                 # Early return: No tool calls means final response
                 if not tool_calls:
@@ -111,12 +138,23 @@ class ChatAgent:
                             "Agent did not return a response content."
                         )
 
+                    logger.info("💬 Simple completion (no tool calls)")
+                    logger.info(
+                        f"Response: {final_content[:200]}{'...' if len(final_content) > 200 else ''}"
+                    )
                     self.messages.append(
                         {"role": "assistant", "content": final_content}
                     )
                     return final_content
 
                 # Tool calls detected - add to message history
+                logger.info(
+                    f"🔧 Tool calls detected: {len(tool_calls)} tool(s)"
+                )
+                for tc in tool_calls:
+                    logger.info(
+                        f"  - {tc.function.name}({tc.function.arguments[:100]}{'...' if len(tc.function.arguments) > 100 else ''})"
+                    )
                 self.messages.append(
                     {
                         "role": "assistant",
