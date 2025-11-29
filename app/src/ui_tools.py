@@ -317,3 +317,64 @@ class UIToolService:
                 strict=True,
             ),
         ]
+
+    def get_tool_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Returns metadata for UI tools (keywords, categories)."""
+        return {
+            "create_page": {
+                "keywords": ["create", "new", "page", "dashboard", "add page"],
+                "category": "ui_management",
+            },
+            "create_layout": {
+                "keywords": [
+                    "create",
+                    "layout",
+                    "columns",
+                    "container",
+                    "grid",
+                ],
+                "category": "ui_management",
+            },
+            "add_component": {
+                "keywords": [
+                    "add",
+                    "component",
+                    "text",
+                    "chart",
+                    "metric",
+                    "widget",
+                ],
+                "category": "ui_management",
+            },
+            "update_page": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "page",
+                    "title",
+                    "icon",
+                ],
+                "category": "ui_management",
+            },
+            "update_component": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "component",
+                    "data",
+                ],
+                "category": "ui_management",
+            },
+            "update_layout": {
+                "keywords": [
+                    "update",
+                    "modify",
+                    "change",
+                    "layout",
+                    "columns",
+                ],
+                "category": "ui_management",
+            },
+        }
