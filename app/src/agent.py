@@ -14,7 +14,7 @@ logger = logging.getLogger("agent")
 
 class ChatAgent:
     def __init__(
-        self, max_iterations: int = 10, use_tool_manager: bool = True
+        self, max_iterations: int = 10, use_tool_manager: bool = False
     ):
         system_message = {
             "role": "system",
