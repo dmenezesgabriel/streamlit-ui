@@ -118,28 +118,43 @@ class SidebarManager:
 class MessageRenderer:
     """Responsible for rendering chat messages and tool updates."""
 
+    def __init__(self):
+        self.current_tool_calls = []  # Temporary storage for current execution
+
     def render_history(self, messages: List[Dict[str, Any]]):
         for message in messages:
-            # We skip tool calls in the main history if we want a cleaner look,
-            # or render them differently. For now, standard rendering.
             if message["role"] == "tool":
-                continue  # Tool results are usually shown inside the assistant's turn or skipped
+                continue  # Tool results are shown with assistant messages
 
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-                if "tool_calls" in message:
-                    for tool_call in message["tool_calls"]:
+
+                # Render stored tool calls and results
+                if "tool_calls_metadata" in message:
+                    for tool_meta in message["tool_calls_metadata"]:
                         with st.status(
-                            f"Used tool: {tool_call['function']['name']}",
+                            f"Called tool: {tool_meta['name']}",
                             state="complete",
                         ):
-                            st.write(
-                                f"Arguments: {tool_call['function']['arguments']}"
-                            )
+                            st.write(f"Arguments: {tool_meta['arguments']}")
+
+                        if "result" in tool_meta:
+                            with st.expander(
+                                f"Result from {tool_meta['name']}"
+                            ):
+                                st.code(tool_meta["result"])
 
     def on_tool_call(self, tool_call):
         logger.info(f"🔧 Tool call initiated: {tool_call.function.name}")
         logger.debug(f"Tool arguments: {tool_call.function.arguments}")
+
+        # Store tool call metadata
+        tool_meta = {
+            "name": tool_call.function.name,
+            "arguments": tool_call.function.arguments,
+        }
+        self.current_tool_calls.append(tool_meta)
+
         with st.status(
             f"Calling tool: {tool_call.function.name}...", expanded=False
         ) as status:
@@ -152,8 +167,24 @@ class MessageRenderer:
     def on_tool_result(self, tool_call, result):
         logger.info(f"✅ Tool result received: {tool_call.function.name}")
         logger.debug(f"Result preview: {result[:200]}...")
+
+        # Add result to the most recent tool call with matching name
+        for tool_meta in reversed(self.current_tool_calls):
+            if (
+                tool_meta["name"] == tool_call.function.name
+                and "result" not in tool_meta
+            ):
+                tool_meta["result"] = result
+                break
+
         with st.expander(f"Result from {tool_call.function.name}"):
             st.code(result)
+
+    def get_and_clear_tool_calls(self) -> List[Dict[str, Any]]:
+        """Get current tool calls and clear the list for next execution."""
+        tool_calls = self.current_tool_calls.copy()
+        self.current_tool_calls = []
+        return tool_calls
 
     def user_choice_callback(self, tool_name: str, origins: List[str]) -> str:
         logger.warning(f"Ambiguous tool {tool_name} in {origins}")
@@ -164,21 +195,19 @@ class MessageRenderer:
 
 
 class DynamicPageRenderer:
-    """Renders dynamic pages based on UIPage models."""
+    """Renders dynamic pages based on UIPage models using Strategy pattern."""
 
     @staticmethod
     def _render_component(
         component: Union[UIComponent, LayoutComponent], depth: int = 0
     ):
         """Recursively render a component (content or layout)."""
-        import json
-        import pandas as pd
+        from component_strategies import ComponentStrategyFactory
 
         try:
+            # Handle layout components
             if isinstance(component, LayoutComponent):
-                # Render layout component
                 if component.type == LayoutType.COLUMNS:
-                    # Get column spec from props
                     spec = component.props.get(
                         "spec", len(component.children) or 1
                     )
@@ -202,9 +231,9 @@ class DynamicPageRenderer:
                                 DynamicPageRenderer._render_component(
                                     child, depth + 1
                                 )
+                    return
 
-                elif component.type == LayoutType.CONTAINER:
-                    # Get container props
+                if component.type == LayoutType.CONTAINER:
                     border = component.props.get("border")
                     height = component.props.get("height", "content")
                     width = component.props.get("width", "stretch")
@@ -223,90 +252,21 @@ class DynamicPageRenderer:
                             DynamicPageRenderer._render_component(
                                 child, depth + 1
                             )
-            else:
-                # Render content component
-                if component.type == ComponentType.TEXT:
-                    st.write(component.data)
-                elif component.type == ComponentType.MARKDOWN:
-                    st.markdown(component.data)
-                elif component.type == ComponentType.HEADER:
-                    st.header(component.data)
-                elif component.type == ComponentType.SUBHEADER:
-                    st.subheader(component.data)
-                elif component.type == ComponentType.CODE:
-                    st.code(
-                        component.data,
-                        language=component.props.get("language", "python"),
-                    )
-                elif component.type == ComponentType.DATAFRAME:
-                    # Parse JSON string if needed
-                    data = component.data
-                    if isinstance(data, str):
-                        try:
-                            parsed = json.loads(data)
-                            if isinstance(parsed, dict) and "data" in parsed:
-                                df = pd.DataFrame(
-                                    parsed["data"],
-                                    columns=parsed.get("columns", None),
-                                )
-                            else:
-                                df = pd.DataFrame(parsed)
-                            st.dataframe(df)
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to parse dataframe data: {e}"
-                            )
-                            st.error(f"Invalid dataframe data: {e}")
-                            st.code(data)
-                    else:
-                        st.dataframe(data)
-                elif component.type == ComponentType.BAR_CHART:
-                    data = component.data
-                    if isinstance(data, str):
-                        try:
-                            parsed = json.loads(data)
-                            if isinstance(parsed, dict) and "data" in parsed:
-                                df = pd.DataFrame(
-                                    parsed["data"],
-                                    columns=parsed.get("columns", None),
-                                )
-                            else:
-                                df = pd.DataFrame(parsed)
-                            st.bar_chart(df)
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to parse bar chart data: {e}"
-                            )
-                            st.error(f"Invalid bar chart data: {e}")
-                    else:
-                        st.bar_chart(data)
-                elif component.type == ComponentType.LINE_CHART:
-                    data = component.data
-                    if isinstance(data, str):
-                        try:
-                            parsed = json.loads(data)
-                            if isinstance(parsed, dict) and "data" in parsed:
-                                df = pd.DataFrame(
-                                    parsed["data"],
-                                    columns=parsed.get("columns", None),
-                                )
-                            else:
-                                df = pd.DataFrame(parsed)
-                            st.line_chart(df)
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to parse line chart data: {e}"
-                            )
-                            st.error(f"Invalid line chart data: {e}")
-                    else:
-                        st.line_chart(data)
-                elif component.type == ComponentType.METRIC:
-                    st.metric(
-                        label=component.props.get("label", ""),
-                        value=component.data,
-                    )
-                else:
-                    st.warning(f"Unknown component type: {component.type}")
+                    return
+
+                # Unknown layout type
+                logger.warning(f"Unknown layout type: {component.type}")
+                st.warning(f"Unknown layout type: {component.type}")
+                return
+
+            # Handle content components using Strategy pattern
+            strategy = ComponentStrategyFactory.get_strategy(component.type)
+            strategy.render(component)
+
+        except ValueError as e:
+            # Strategy not found
+            logger.warning(f"Unknown component type: {component.type}")
+            st.warning(f"Unknown component type: {component.type}")
         except Exception as e:
             logger.error(
                 f"Error rendering component {component.id}: {e}", exc_info=True
@@ -433,9 +393,21 @@ class ChatInterface:
                         tool_executor=self.loop_context.run_coroutine,
                     )
                     message_placeholder.markdown(response)
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": response}
+
+                    # Get tool calls metadata and save with message
+                    tool_calls_metadata = (
+                        self.renderer.get_and_clear_tool_calls()
                     )
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": response,
+                    }
+                    if tool_calls_metadata:
+                        assistant_message["tool_calls_metadata"] = (
+                            tool_calls_metadata
+                        )
+
+                    st.session_state.messages.append(assistant_message)
 
                     # Check if pages changed and rerun if necessary
                     final_page_count = len(self.ui_repository.get_all_pages())

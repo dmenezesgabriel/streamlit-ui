@@ -102,6 +102,52 @@ ColorType = Union[
 ]
 
 
+class Page(BaseModel):
+    page: Union[str, Path, Callable] = Field(
+        description=(
+            "The page source: a string path, a pathlib.Path, or a no-argument callable. "
+            "If a path, may be absolute or relative to the entrypoint file. "
+            "If a callable, it must not accept any arguments."
+        )
+    )
+
+    title: str | None = Field(
+        default=None,
+        description=(
+            "Optional title of the page. If None, the title and navigation label will be "
+            "inferred from the filename or callable name."
+        ),
+    )
+
+    icon: str | None = Field(
+        default=None,
+        description=(
+            "Optional emoji or Material Symbols icon. "
+            "Examples: '🔥', '🚨', or ':material/thumb_up:'. "
+            "If None, no icon is shown in the nav and the browser tab uses Streamlit's icon."
+        ),
+    )
+
+    url_path: str | None = Field(
+        default=None,
+        description=(
+            "Optional URL path for the page (relative to the app root). "
+            "If None, inferred from the file or callable name. "
+            "Ignored when default=True. Cannot contain forward slashes."
+        ),
+    )
+
+    default: bool = Field(
+        default=False,
+        description=(
+            "Whether this page is the default root page (''). "
+            "If True, url_path is ignored. "
+            "If no page is explicitly marked default and this is the first page, "
+            "Streamlit treats this as the default."
+        ),
+    )
+
+
 class TitleComponent(BaseModel):
     body: str = Field(
         ...,
