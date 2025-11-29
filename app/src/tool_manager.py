@@ -1,13 +1,9 @@
-"""
-Tool Manager for lazy-loading tool discovery.
-Reduces token consumption by only loading tools on-demand.
-"""
-
 import json
 import logging
 from typing import Dict, List, Optional, Set, Any
 import numpy as np
 from src.tool_models import Tool
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("tool_manager")
 
@@ -25,17 +21,19 @@ class ToolManager:
         # Initialize semantic search model
         self.model = None
         self.tool_embeddings = {}
-        try:
-            from sentence_transformers import SentenceTransformer
 
-            self.model = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("🧠 Semantic search model loaded: all-MiniLM-L6-v2")
-        except ImportError:
+        if SentenceTransformer:
+            try:
+                self.model = SentenceTransformer("all-MiniLM-L6-v2")
+                logger.info(
+                    "🧠 Semantic search model loaded: all-MiniLM-L6-v2"
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to load semantic search model: {e}")
+        else:
             logger.warning(
                 "⚠️ sentence-transformers not found. Falling back to keyword search."
             )
-        except Exception as e:
-            logger.error(f"❌ Failed to load semantic search model: {e}")
 
     def register_tool(
         self,
