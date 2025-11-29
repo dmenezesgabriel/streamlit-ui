@@ -40,15 +40,12 @@ class SessionManager:
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # Initialize UI Repository (it handles its own session state check)
         if "ui_repository" not in st.session_state:
             logger.info("Initializing UI Repository")
             st.session_state.ui_repository = SessionStateUIRepository()
 
 
 class SidebarManager:
-    """Manages the sidebar and MCP server connections."""
-
     def __init__(
         self,
         agent: ChatAgent,
@@ -60,14 +57,10 @@ class SidebarManager:
         self.loop_context = loop_context
 
     def connect_servers(self):
-        # Guard: Already connected
         if st.session_state.mcp_connected:
             return
 
         logger.info("Connecting to MCP servers...")
-        # We run the connection logic on the background loop
-        # But we need to update session state and toast, which must be done in the main thread.
-        # However, run_coroutine blocks until done, so we are back in main thread after it returns.
 
         async def _connect():
             results = []
@@ -75,11 +68,9 @@ class SidebarManager:
                 if self.mcp_configs is None:
                     continue
 
-                # Guard: Skip disabled servers
                 if not config.enabled:
                     continue
 
-                # Guard: Skip already connected servers
                 if config.name in self.agent.mcp_servers:
                     continue
 
@@ -125,21 +116,17 @@ class SidebarManager:
 
 
 class MessageRenderer:
-    """Responsible for rendering chat messages and tool updates."""
-
     def __init__(self):
-        self.current_tool_calls = []  # Temporary storage for current execution
+        self.current_tool_calls = []
 
     def render_history(self, messages: List[Dict[str, Any]]):
         for message in messages:
-            # Guard: Skip tool messages
             if message["role"] == "tool":
                 continue
 
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-                # Render stored tool calls and results
                 if "tool_calls_metadata" in message:
                     for tool_meta in message["tool_calls_metadata"]:
                         with st.status(
@@ -159,7 +146,6 @@ class MessageRenderer:
         logger.info(f"🔧 Tool call initiated: {tool_call.function.name}")
         logger.debug(f"Tool arguments: {tool_call.function.arguments}")
 
-        # Store tool call metadata
         tool_meta = {
             "name": tool_call.function.name,
             "arguments": tool_call.function.arguments,
@@ -193,7 +179,6 @@ class MessageRenderer:
             st.code(result)
 
     def get_and_clear_tool_calls(self) -> List[Dict[str, Any]]:
-        """Get current tool calls and clear the list for next execution."""
         tool_calls = self.current_tool_calls.copy()
         self.current_tool_calls = []
         return tool_calls
@@ -207,8 +192,6 @@ class MessageRenderer:
 
 
 class DynamicPageRenderer:
-    """Renders dynamic pages based on UIPage models using Strategy pattern."""
-
     @staticmethod
     def _render_component(
         component: Union[UIComponent, LayoutComponent], depth: int = 0
@@ -216,7 +199,6 @@ class DynamicPageRenderer:
         """Recursively render a component (content or layout)."""
 
         try:
-            # Handle layout components
             if isinstance(component, LayoutComponent):
                 if component.type == LayoutType.COLUMNS:
                     spec = component.props.get(
@@ -235,7 +217,6 @@ class DynamicPageRenderer:
                         border=border,
                     )
 
-                    # Render children into columns
                     for idx, child in enumerate(component.children):
                         if idx < len(cols):
                             with cols[idx]:
@@ -265,17 +246,14 @@ class DynamicPageRenderer:
                             )
                     return
 
-                # Unknown layout type
                 logger.warning(f"Unknown layout type: {component.type}")
                 st.warning(f"Unknown layout type: {component.type}")
                 return
 
-            # Handle content components using Strategy pattern
             strategy = ComponentStrategyFactory.get_strategy(component.type)
             strategy.render(component)
 
         except ValueError as e:
-            # Strategy not found
             logger.warning(f"Unknown component type: {component.type}")
             st.warning(f"Unknown component type: {component.type}")
         except Exception as e:
@@ -307,7 +285,6 @@ class DynamicPageRenderer:
             if not hasattr(c, "parent_id") or c.parent_id is None
         ]
 
-        # Render top-level components
         for component in top_level_components:
             DynamicPageRenderer._render_component(component)
 
@@ -319,8 +296,8 @@ class ChatInterface:
         self.mcp_configs = mcp_configs
         self.renderer = MessageRenderer()
 
-        # Initialize session
         SessionManager.initialize_state(self._create_agent)
+
         self.agent: ChatAgent = st.session_state.agent
         self.loop_context: GlobalLoopContext = st.session_state.loop_context
         self.sidebar = SidebarManager(
@@ -342,10 +319,8 @@ class ChatInterface:
         return agent
 
     def initialize(self):
-        # Synchronous wrapper that calls async logic on background loop
         self.sidebar.connect_servers()
 
-        # Guard: Tools already registered
         if self.agent.tool_manager:
             stats = self.agent.tool_manager.get_stats()
             if stats["total_registered"] > 1:  # More than just search_tools
@@ -355,13 +330,10 @@ class ChatInterface:
             if "create_page" in tool_names:
                 return
 
-        # Register UI tools with keywords for discovery
         ui_service = UIToolService(self.ui_repository)
 
-        # Define tool metadata for lazy loading
         tool_metadata = ui_service.get_tool_metadata()
 
-        # Map tool names to their implementation methods
         tool_function_map = {
             "create_page": ui_service.create_page,
             "create_layout": ui_service.create_layout,
@@ -380,7 +352,6 @@ class ChatInterface:
                 always_load=False,  # Don't load UI tools by default
             )
 
-            # Register tool function using mapping
             if tool.name in tool_function_map:
                 self.agent.add_tool_function(
                     tool.name, tool_function_map[tool.name]
@@ -391,14 +362,11 @@ class ChatInterface:
         )
 
     def _process_user_message(self, prompt: str) -> None:
-        """Process a user message and handle the agent response."""
         message_placeholder = st.empty()
 
-        # Capture initial page count to detect changes
         initial_page_count = len(self.ui_repository.get_all_pages())
 
         try:
-            # Run the agent logic synchronously (callbacks in main thread)
             response = self.agent.process_message(
                 prompt,
                 user_choice_callback=self.renderer.user_choice_callback,
@@ -408,7 +376,6 @@ class ChatInterface:
             )
             message_placeholder.markdown(response)
 
-            # Get tool calls metadata and save with message
             tool_calls_metadata = self.renderer.get_and_clear_tool_calls()
             assistant_message = {"role": "assistant", "content": response}
             if tool_calls_metadata:
@@ -416,7 +383,6 @@ class ChatInterface:
 
             st.session_state.messages.append(assistant_message)
 
-            # Check if pages changed and rerun if necessary
             final_page_count = len(self.ui_repository.get_all_pages())
             if final_page_count != initial_page_count:
                 logger.info(
@@ -429,23 +395,19 @@ class ChatInterface:
             st.error(f"An error occurred: {e}")
 
     def run(self):
-        # Guard: Initialize if not connected
         if not st.session_state.mcp_connected:
             self.initialize()
 
         self.sidebar.render()
         self.renderer.render_history(st.session_state.messages)
 
-        # Guard: No input, nothing to do
         prompt = st.chat_input("What is up?")
         if not prompt:
             return
 
-        # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Process with assistant
         with st.chat_message("assistant"):
             self._process_user_message(prompt)

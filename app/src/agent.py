@@ -118,16 +118,6 @@ class ChatAgent:
         on_tool_result: Optional[Callable[[Dict[str, Any], str], None]] = None,
         tool_executor: Optional[Callable[[Any], Any]] = None,
     ):
-        """
-        Process a user message and return the final agent response.
-
-        Args:
-            user_input: The message from the user.
-            user_choice_callback: Callback to resolve ambiguous tool origins.
-            on_tool_call: Callback invoked when the agent decides to call a tool.
-            on_tool_result: Callback invoked when a tool execution completes.
-            tool_executor: Function to execute async tool calls (e.g. on a background loop).
-        """
         self.messages.append({"role": "user", "content": user_input})
         tool_schemas = self.aggregate_tools()
 

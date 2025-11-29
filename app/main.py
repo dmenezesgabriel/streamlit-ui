@@ -5,7 +5,7 @@ from src.repositories import SessionStateUIRepository
 from src.logging_config import setup_logging
 import logging
 
-# Setup logging
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -14,22 +14,16 @@ st.set_page_config(page_title="AI Agent", page_icon="🤖")
 
 def main():
     logger.info("Starting main application")
-    # Initialize repository to get pages
-    # Note: ChatInterface also initializes it, but we need it here for navigation
-    # We can rely on SessionStateUIRepository being idempotent in its init (checking session state)
     repo = SessionStateUIRepository()
 
-    # Define the main chat page
     chat_page = st.Page(
         lambda: ChatInterface(get_default_mcp_servers()).run(),
         title="Chat",
         icon="💬",
-        url_path="chat",  # explicit url path
+        url_path="chat",
     )
 
     pages = [chat_page]
-
-    # Add dynamic pages
     for ui_page in repo.get_all_pages():
         # We need to capture the page object in the lambda default argument
         # otherwise all pages will render the last page in the loop
