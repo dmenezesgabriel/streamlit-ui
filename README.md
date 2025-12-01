@@ -1,9 +1,12 @@
-# Generative UI
+# Generative UI [WIP]
 
-- model="gemini/gemini-2.0-flash
+Generative UI Web APP DEMO
 
 ```sh
 uv run streamlit run app/main.py
 ```
 
 
+<video width="100%" height="auto" controls>
+  <source src="./assets/demo.webm" type="video/mp4">
+</video>

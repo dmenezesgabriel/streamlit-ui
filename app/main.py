@@ -16,7 +16,7 @@ st.set_page_config(page_title="AI Agent", page_icon="🤖")
 
 def create_agent() -> ChatAgent:
     """Factory function to create the ChatAgent with default tools."""
-    agent = ChatAgent(use_tool_manager=True)
+    agent = ChatAgent(use_tool_manager=False)
     agent.add_tool_definition(
         greeting_tool,
         keywords=["hello", "hi", "greet", "greeting"],
