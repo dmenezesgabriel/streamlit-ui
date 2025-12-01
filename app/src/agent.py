@@ -132,7 +132,7 @@ class ChatAgent:
                 logger.debug(f"🛠️ Sending tools to LLM: {tool_names}")
 
                 completion = litellm.completion(
-                    model="groq/llama-3.3-70b-versatile",
+                    model="gemini/gemini-2.0-flash",
                     messages=self.messages,
                     tools=(
                         [
@@ -219,6 +219,13 @@ class ChatAgent:
                         for tool in tool_schemas
                         if tool["function"]["name"] == name
                     ]
+
+                    if not origins and self.tool_manager:
+                        # The tool might have been loaded during this turn (e.g. by search_tools)
+                        # Refresh active tools to check
+                        active_tools = self.tool_manager.get_active_tools()
+                        if any(t.name == name for t in active_tools):
+                            origins = ["local"]
 
                     if not origins:
                         result_str = f"Error: Tool '{name}' not found in available tools."

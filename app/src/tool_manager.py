@@ -139,11 +139,8 @@ class ToolManager:
         matches.sort(key=lambda x: x["score"], reverse=True)
         results = matches[:top_k]
 
-        # Auto-load tools with high confidence
-        # For semantic search, >0.4 is a strong match
-        # For keyword search, >=1.0 is a strong match
-        threshold = 0.4 if (self.model and self.tool_embeddings) else 1.0
-        tools_to_load = [m["name"] for m in results if m["score"] >= threshold]
+        # Auto-load all found tools
+        tools_to_load = [m["name"] for m in results]
 
         if tools_to_load:
             self.load_tools(tools_to_load)
@@ -154,10 +151,6 @@ class ToolManager:
             return (
                 json.dumps(results, indent=2)
                 + "\n\nSYSTEM_NOTIFICATION: The tools listed above have been automatically loaded. You MUST now call the relevant tool immediately in this same turn. Do not ask the user for confirmation."
-            )
-        elif results:
-            logger.info(
-                f"🔍 Found {len(results)} tools but none met threshold >= {threshold} for auto-loading"
             )
 
         return json.dumps(results, indent=2)

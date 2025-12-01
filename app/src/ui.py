@@ -308,7 +308,7 @@ class ChatInterface:
         )
 
     def _create_agent(self) -> ChatAgent:
-        agent = ChatAgent()
+        agent = ChatAgent(use_tool_manager=True)
         agent.add_tool_definition(
             greeting_tool,
             keywords=["hello", "hi", "greet", "greeting"],
