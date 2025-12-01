@@ -292,11 +292,16 @@ class DynamicPageRenderer:
 class ChatInterface:
     """Main class for the Chat Interface."""
 
-    def __init__(self, mcp_configs: List[MCPServerConfig]):
+    def __init__(
+        self,
+        mcp_configs: List[MCPServerConfig],
+        agent_factory: Callable[[], ChatAgent],
+    ):
         self.mcp_configs = mcp_configs
         self.renderer = MessageRenderer()
+        self.agent_factory = agent_factory
 
-        SessionManager.initialize_state(self._create_agent)
+        SessionManager.initialize_state(self.agent_factory)
 
         self.agent: ChatAgent = st.session_state.agent
         self.loop_context: GlobalLoopContext = st.session_state.loop_context
@@ -306,17 +311,6 @@ class ChatInterface:
         self.ui_repository: StreamlitUIRepository = (
             st.session_state.ui_repository
         )
-
-    def _create_agent(self) -> ChatAgent:
-        agent = ChatAgent(use_tool_manager=True)
-        agent.add_tool_definition(
-            greeting_tool,
-            keywords=["hello", "hi", "greet", "greeting"],
-            category="general",
-            always_load=True,  # Always available for simple interactions
-        )
-        agent.add_tool_function("greeting", greeting)
-        return agent
 
     def initialize(self):
         self.sidebar.connect_servers()
